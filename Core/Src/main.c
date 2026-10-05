@@ -31,6 +31,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "lps22hh.h"
+#include "lps22hh_port_stm32.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,11 +42,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define LPS22HH_ADDR          (0x5DU << 1)  /* SA0 = 1 sur cette carte */
-#define LPS22HH_WHO_AM_I      0x0FU
-#define LPS22HH_CTRL_REG1     0x10U
-#define LPS22HH_PRESS_OUT_XL  0x28U         /* 5 octets : P(3) + T(2) */
-#define LPS22HH_ID            0xB3U
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -55,52 +53,19 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+static lps22hh_t lps;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void SystemPower_Config(void);
 /* USER CODE BEGIN PFP */
-static void i2c2_recover(void);
-static HAL_StatusTypeDef lps_read(uint8_t reg, uint8_t *b, uint16_t n);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-/* Releases a stuck I2C slave (9 SCL pulses + STOP) then resets I2C2 */
-static void i2c2_recover(void)
-{
-  GPIO_InitTypeDef g = {0};
 
-  HAL_I2C_DeInit(&hi2c2);
-
-  __HAL_RCC_GPIOH_CLK_ENABLE();
-  g.Pin   = GPIO_PIN_4 | GPIO_PIN_5;        /* PH4 = SCL, PH5 = SDA */
-  g.Mode  = GPIO_MODE_OUTPUT_OD;
-  g.Pull  = GPIO_PULLUP;
-  g.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOH, &g);
-
-  HAL_GPIO_WritePin(GPIOH, GPIO_PIN_4 | GPIO_PIN_5, GPIO_PIN_SET);
-  HAL_Delay(1);
-  for (int i = 0; i < 9; i++)
-  {
-    HAL_GPIO_WritePin(GPIOH, GPIO_PIN_4, GPIO_PIN_RESET); HAL_Delay(1);
-    HAL_GPIO_WritePin(GPIOH, GPIO_PIN_4, GPIO_PIN_SET);   HAL_Delay(1);
-  }
-  HAL_GPIO_WritePin(GPIOH, GPIO_PIN_5, GPIO_PIN_RESET); HAL_Delay(1);  /* STOP */
-  HAL_GPIO_WritePin(GPIOH, GPIO_PIN_4, GPIO_PIN_SET);   HAL_Delay(1);
-  HAL_GPIO_WritePin(GPIOH, GPIO_PIN_5, GPIO_PIN_SET);   HAL_Delay(1);
-
-  MX_I2C2_Init();                           /* sets the pins back to AF4 */
-}
-
-static HAL_StatusTypeDef lps_read(uint8_t reg, uint8_t *b, uint16_t n)
-{
-  return HAL_I2C_Mem_Read(&hi2c2, LPS22HH_ADDR, reg,
-                          I2C_MEMADD_SIZE_8BIT, b, n, 100);
-}
 /* USER CODE END 0 */
 
 /**
@@ -157,53 +122,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    static uint8_t ready = 0;
     char msg[96];
-    int len;
-    HAL_StatusTypeDef st;
-
-    if (!ready)
-    {
-      uint8_t id = 0;
-      st = lps_read(LPS22HH_WHO_AM_I, &id, 1);
-      if (st == HAL_OK && id == LPS22HH_ID)
-      {
-        uint8_t cfg = 0x22;                 /* ODR = 10 Hz, BDU = 1 */
-        st = HAL_I2C_Mem_Write(&hi2c2, LPS22HH_ADDR, LPS22HH_CTRL_REG1,
-                               I2C_MEMADD_SIZE_8BIT, &cfg, 1, 100);
-        ready = (st == HAL_OK);
-      }
-      len = snprintf(msg, sizeof msg, "init: st=%d err=0x%02lX id=0x%02X\r\n",
-                     (int)st, (unsigned long)hi2c2.ErrorCode, id);
-      HAL_UART_Transmit(&huart1, (uint8_t *)msg, len, 100);
-      if (!ready) i2c2_recover();
-    }
-    else
-    {
-      uint8_t buf[5];
-      st = lps_read(LPS22HH_PRESS_OUT_XL, buf, 5);
-      if (st == HAL_OK)
-      {
-        int32_t raw_p = ((int32_t)buf[2] << 16) | ((int32_t)buf[1] << 8) | buf[0];
-        int16_t raw_t = (int16_t)(((uint16_t)buf[4] << 8) | buf[3]);
-        int32_t p_c = (raw_p * 100) / 4096;   /* centi-hPa (4096 LSB/hPa) */
-        int32_t t_c = raw_t;                  /* centi-°C  (100 LSB/°C)   */
-        const char *sign = (t_c < 0) ? "-" : "";
-        if (t_c < 0) t_c = -t_c;
-
-        len = snprintf(msg, sizeof msg, "P=%ld.%02ld hPa  T=%s%ld.%02ld C\r\n",
-                       (long)(p_c / 100), (long)(p_c % 100),
-                       sign, (long)(t_c / 100), (long)(t_c % 100));
-      }
-      else
-      {
-        len = snprintf(msg, sizeof msg, "lecture: st=%d err=0x%02lX\r\n",
-                       (int)st, (unsigned long)hi2c2.ErrorCode);
-        ready = 0;
-        i2c2_recover();
-      }
-      HAL_UART_Transmit(&huart1, (uint8_t *)msg, len, 100);
-    }
+    int len = lps22hh_step(&lps, &lps22hh_stm32_bus, msg, sizeof msg);
+    HAL_UART_Transmit(&huart1, (uint8_t *)msg, (uint16_t)len, 100);
     HAL_Delay(1000);
   }
   /* USER CODE END 3 */
