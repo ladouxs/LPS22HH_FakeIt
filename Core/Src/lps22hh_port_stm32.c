@@ -1,5 +1,6 @@
-/* Adaptateur cible : branche le driver LPS22HH (lib/lps22hh) sur le HAL STM32U5.
- * Non compilé dans les tests hôte. */
+/* Target adapter: connects the LPS22HH driver (lib/lps22hh) to the STM32U5 HAL. 
+*  Not compiled in host tests. 
+*/
 #include "lps22hh_port_stm32.h"
 #include "main.h"
 #include "i2c.h"
@@ -7,7 +8,7 @@
 #define LPS22HH_ADDR       (0x5DU << 1)  /* SA0 = 1 sur cette carte */
 #define LPS22HH_TIMEOUT_MS 100U
 
-/* Libère un esclave I2C bloqué (9 impulsions SCL + STOP) puis réinitialise I2C2 */
+/* Releases a stuck I2C slave (9 SCL pulses + STOP) then resets I2C2 */
 static void i2c2_recover(void)
 {
   GPIO_InitTypeDef g = {0};
@@ -32,7 +33,7 @@ static void i2c2_recover(void)
   HAL_GPIO_WritePin(GPIOH, GPIO_PIN_4, GPIO_PIN_SET);   HAL_Delay(1);
   HAL_GPIO_WritePin(GPIOH, GPIO_PIN_5, GPIO_PIN_SET);   HAL_Delay(1);
 
-  MX_I2C2_Init();                           /* remet les broches en AF4 */
+  MX_I2C2_Init();                           /* sets the pins back to AF4 */
 }
 
 static int hal_read(void *ctx, uint8_t reg, uint8_t *b, uint16_t n)
