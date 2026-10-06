@@ -3,7 +3,7 @@
 
 #include "lps22hh.h"
 
-/* Bus I2C2 du LPS22HH branché sur le HAL STM32U5. */
+/* LPS22HH I2C2 bus connected to the STM32U5 HAL. */
 extern const lps22hh_bus_t lps22hh_stm32_bus;
 
 #endif /* LPS22HH_PORT_STM32_H */
