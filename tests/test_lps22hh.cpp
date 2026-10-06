@@ -82,7 +82,7 @@ struct Env {
   }
 };
 
-TEST_CASE("init nominale") {
+TEST_CASE("nominal initialization") {
   Env e;
   CHECK(e.step() == "init: st=0 err=0x00 id=0xB3\r\n");
   CHECK(e.dev.ready == 1);
@@ -91,7 +91,7 @@ TEST_CASE("init nominale") {
   Verify(Method(e.mock, recover)).Exactly(0);
 }
 
-TEST_CASE("init : mauvais WHO_AM_I -> pas d'écriture, bus récupéré") {
+TEST_CASE("init: invalid WHO_AM_I -> no write, bus recovered") {
   Env e;
   e.lps.regs[LPS22HH_WHO_AM_I] = 0x42;
   CHECK(e.step() == "init: st=0 err=0x00 id=0x42\r\n");
@@ -100,7 +100,7 @@ TEST_CASE("init : mauvais WHO_AM_I -> pas d'écriture, bus récupéré") {
   Verify(Method(e.mock, recover)).Exactly(1);
 }
 
-TEST_CASE("init : NACK sur WHO_AM_I") {
+TEST_CASE("initialization: NACK on WHO_AM_I") {
   Env e;
   e.lps.stuck = true;
   CHECK(e.step() == "init: st=1 err=0x04 id=0x00\r\n");
@@ -108,7 +108,7 @@ TEST_CASE("init : NACK sur WHO_AM_I") {
   Verify(Method(e.mock, recover)).Exactly(1);
 }
 
-TEST_CASE("init : échec de l'écriture CTRL_REG1") {
+TEST_CASE("init: CTRL_REG1 write failed") {
   Env e;
   e.lps.fail_writes = 1;
   CHECK(e.step() == "init: st=1 err=0x04 id=0xB3\r\n");
@@ -116,7 +116,7 @@ TEST_CASE("init : échec de l'écriture CTRL_REG1") {
   Verify(Method(e.mock, recover)).Exactly(1);
 }
 
-TEST_CASE("lecture nominale : 1013.25 hPa, 23.45 C") {
+TEST_CASE("nominal reading : 1013.25 hPa, 23.45 C") {
   Env e;
   e.step();                                  // init
   e.lps.set_measure(4150272, 2345);          // 1013.25 * 4096 ; 23.45 * 100
@@ -126,28 +126,28 @@ TEST_CASE("lecture nominale : 1013.25 hPa, 23.45 C") {
   Verify(Method(e.mock, recover)).Exactly(0);
 }
 
-TEST_CASE("température négative") {
+TEST_CASE("negative temperature") {
   Env e;
   e.step();
   e.lps.set_measure(4150272, -507);
   CHECK(e.step() == "P=1013.25 hPa  T=-5.07 C\r\n");
 }
 
-TEST_CASE("température négative inférieure à 1 degré garde son signe") {
+TEST_CASE("A negative temperature lower than 1 degree retains its sign.") {
   Env e;
   e.step();
   e.lps.set_measure(4150272, -5);
   CHECK(e.step() == "P=1013.25 hPa  T=-0.05 C\r\n");
 }
 
-TEST_CASE("pression maximale 24 bits sans débordement") {
+TEST_CASE("maximum 24-bit pressure without overflow") {
   Env e;
   e.step();
   e.lps.set_measure(0xFFFFFF, 0);
   CHECK(e.step() == "P=4095.99 hPa  T=0.00 C\r\n");
 }
 
-TEST_CASE("erreur de lecture : retour en init et récupération du bus") {
+TEST_CASE("Read error: return to initialization and bus recovery.") {
   Env e;
   e.step();
   e.lps.set_measure(4150272, 2345);
@@ -156,7 +156,7 @@ TEST_CASE("erreur de lecture : retour en init et récupération du bus") {
   e.lps.timeout_reads = 1;                
 
   // timeout on the next read only
-  CHECK(e.step() == "lecture: st=3 err=0x20\r\n");
+  CHECK(e.step() == "reading: st=3 err=0x20\r\n");
   CHECK(e.dev.ready == 0);
   Verify(Method(e.mock, recover)).Exactly(1);
 
@@ -165,7 +165,7 @@ TEST_CASE("erreur de lecture : retour en init et récupération du bus") {
   CHECK(e.dev.ready == 1);
 }
 
-TEST_CASE("scénario : esclave bloqué libéré par recover()") {
+TEST_CASE("scenario: blocked slave released by recover()") {
   Env e;
   e.lps.stuck = true;
   CHECK(e.step() == "init: st=1 err=0x04 id=0x00\r\n");   // blocked, recover() releases it
@@ -175,7 +175,7 @@ TEST_CASE("scénario : esclave bloqué libéré par recover()") {
   Verify(Method(e.mock, recover)).Exactly(1);
 }
 
-TEST_CASE("le message ne déborde jamais du buffer fourni") {
+TEST_CASE("The message never overflows the provided buffer.") {
   Env e;
   char small[16];
   int len = lps22hh_step(&e.dev, &e.bus, small, sizeof small);

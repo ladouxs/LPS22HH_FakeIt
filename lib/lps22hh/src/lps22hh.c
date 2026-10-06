@@ -47,7 +47,7 @@ int lps22hh_step(lps22hh_t *dev, const lps22hh_bus_t *bus, char *msg, size_t siz
     }
     else
     {
-      len = snprintf(msg, size, "lecture: st=%d err=0x%02lX\r\n",
+      len = snprintf(msg, size, "reading: st=%d err=0x%02lX\r\n",
                      st, (unsigned long)bus->last_error(bus->ctx));
       dev->ready = 0;
       bus->recover(bus->ctx);
